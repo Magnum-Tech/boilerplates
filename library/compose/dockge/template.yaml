@@ -1,0 +1,244 @@
+---
+kind: compose
+schema: "1.2"
+metadata:
+  name: Dockge
+  description: |
+    Self-hosted, stack-oriented Docker Compose manager with web UI.
+    Manage containers through their compose.yaml files with full CRUD operations,
+    logs, and terminal access. Alternative to Portainer for compose-focused workflows.
+  version: 1.0.0
+  author: Darrel Jones
+  date: '2026-02-06'
+  tags:
+    - docker
+    - management
+    - compose
+    - self-hosted
+  draft: false
+  next_steps: |
+    ## Next Steps
+    
+    1. Review the generated docker-compose.yml
+    2. Ensure the HOST_STACKS_DIR matches your desired location
+    3. Deploy the stack: `docker compose up -d`
+    4. Access Dockge at http://localhost:{{ host_port }} or your configured domain
+    5. Complete initial setup and create your first stack
+    
+    ## Important Notes
+    
+    - HOST_STACKS_DIR and DOCKGE_STACKS_DIR must point to the same location
+    - Ensure the Docker socket is accessible
+    - Configure Traefik domains if using reverse proxy
+
+spec:
+  general:
+    title: General Configuration
+    description: Basic service configuration
+    vars:
+      service_name:
+        type: str
+        description: Service and stack name
+        default: dockge
+      
+      service_host:
+        type: str
+        description: Container name
+        default: dockge
+      
+      service_image:
+        type: str
+        description: Docker image to use
+        default: louislam/dockge
+      
+      service_version:
+        type: str
+        description: Image tag/version
+        default: latest
+  
+  networking:
+    title: Network Configuration
+    description: Configure networking and ports
+    vars:
+      host_port:
+        type: int
+        description: Host port for web UI
+        default: 5001
+      
+      service_port:
+        type: int
+        description: Container port
+        default: 5001
+      
+      network_proxy:
+        type: str
+        description: Docker network for reverse proxy
+        default: proxy
+  
+  storage:
+    title: Storage Configuration
+    description: Configure data and stack directories
+    vars:
+      host_config_dir:
+        type: str
+        description: Host directory for Dockge data
+        default: ./data
+      
+      host_stacks_dir:
+        type: str
+        description: Host directory for Docker stacks
+        default: /opt/stacks
+        extra: Must match dockge_stacks_dir
+      
+      dockge_stacks_dir:
+        type: str
+        description: Container path for stacks
+        default: /opt/stacks
+        extra: Must match host_stacks_dir
+  
+  homepage:
+    title: Homepage Dashboard Integration
+    description: Configure Homepage dashboard labels
+    toggle: homepage_enabled
+    vars:
+      homepage_enabled:
+        type: bool
+        description: Enable Homepage integration
+        default: false
+      
+      homepage_group:
+        type: str
+        description: Homepage group name
+        default: Docker Management
+        needs: homepage_enabled=true
+      
+      homepage_name:
+        type: str
+        description: Service display name in Homepage
+        default: Dockge
+        needs: homepage_enabled=true
+      
+      homepage_icon:
+        type: str
+        description: Icon to display
+        default: docker.png
+        needs: homepage_enabled=true
+      
+      homepage_href:
+        type: str
+        description: URL for the service
+        default: http://localhost:5001
+        needs: homepage_enabled=true
+      
+      homepage_description:
+        type: str
+        description: Service description
+        default: Docker Compose Stack Manager
+        needs: homepage_enabled=true
+  
+  traefik:
+    title: Traefik Reverse Proxy
+    description: Configure Traefik reverse proxy integration
+    toggle: traefik_enabled
+    vars:
+      traefik_enabled:
+        type: bool
+        description: Enable Traefik integration
+        default: true
+      
+      traefik_preset:
+        type: enum
+        description: Domain routing preset
+        default: internal-only
+        options:
+          - disabled
+          - internal-only
+          - external-only
+          - personal-only
+          - business-only
+          - all-domains
+        needs: traefik_enabled=true
+      
+      traefik_entrypoints:
+        type: str
+        description: Traefik entrypoints
+        default: web,websecure
+        needs: traefik_enabled=true
+      
+      traefik_tls:
+        type: bool
+        description: Enable TLS
+        default: true
+        needs: traefik_enabled=true
+      
+      traefik_internal_certresolver:
+        type: str
+        description: Certificate resolver for internal domains
+        default: internal
+        needs: traefik_enabled=true
+      
+      traefik_external_certresolver:
+        type: str
+        description: Certificate resolver for external domains
+        default: letsencrypt
+        needs: traefik_enabled=true
+      
+      service_subdomain:
+        type: str
+        description: Service subdomain prefix
+        default: dockge
+        needs: traefik_enabled=true
+      
+      host_name:
+        type: str
+        description: Host identifier suffix (optional)
+        default: ""
+        needs: traefik_enabled=true
+        extra: Leave empty or set to host identifier like 'macmini'
+  
+  domains:
+    title: Domain Configuration
+    description: Configure domain names for routing
+    needs: [traefik]
+    vars:
+      domain_root_local:
+        type: str
+        description: Local domain root
+        default: local
+        needs: traefik_enabled=true
+      
+      domain_root_yggdrasil:
+        type: str
+        description: Yggdrasil domain root
+        default: yggdrasil.lan
+        needs: traefik_enabled=true
+      
+      domain_root_magnumtech:
+        type: str
+        description: MagnumTech domain root
+        default: local.magnumtech.live
+        needs: traefik_enabled=true
+      
+      domain_root_magnumtek:
+        type: str
+        description: MagnumTek domain root
+        default: local.magnumtek.com
+        needs: traefik_enabled=true
+      
+      domain_root_ourjones:
+        type: str
+        description: OurJones family domain root
+        default: homelab.ourjones.family
+        needs: traefik_enabled=true
+      
+      domain_root_householderp:
+        type: str
+        description: HouseholderP domain root
+        default: local.householderp.com
+        needs: traefik_enabled=true
+      
+      domain_root_tracksoft:
+        type: str
+        description: TrackSoft domain root
+        default: local.tracksoft.solutions
+        needs: traefik_enabled=true

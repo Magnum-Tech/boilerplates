@@ -1,0 +1,164 @@
+# ============================================================================
+# STACK: {{ service_name }}
+# SERVICE: dockge
+#
+# PURPOSE
+#   Dockge is a self-hosted, stack-oriented manager for Docker Compose focused
+#   on managing services via compose.yaml (create/edit/deploy/up/down, logs, exec)
+#   with the compose file as the source of truth
+#
+# ROLE
+#   - Compose-first workflow: operate stacks through their compose.yaml
+#   - UI/UX layer over `docker compose` operations
+#   - Alternative to Portainer for compose-focused management
+#
+# INTERFACES
+#   Exposes:
+#     - Web UI: http://<host>:{{ host_port }}
+#   Requires:
+#     - Docker socket access (/var/run/docker.sock)
+#   Integrates with:
+{% if traefik_enabled %}
+#     - Traefik reverse proxy ({{ traefik_preset }})
+{% endif %}
+{% if homepage_enabled %}
+#     - Homepage dashboard
+{% endif %}
+#
+# DATA (PERSISTENT)
+#   - {{ host_config_dir }}: Dockge application data and configuration
+#   - {{ host_stacks_dir }}: Docker Compose stacks storage
+#     IMPORTANT: HOST_STACKS_DIR and DOCKGE_STACKS_DIR must match paths
+#
+# COMMANDS
+#   - Start:   docker compose up -d
+#   - Rebuild: docker compose up -d --build
+#   - Logs:    docker compose logs -f --tail=200 {{ service_name }}
+#   - Stop:    docker compose down
+#   - Config:  docker compose config
+# ============================================================================
+
+name: {{ service_name }}
+
+services:
+  {{ service_name }}:
+    container_name: {{ service_host }}
+    
+    image: {{ service_image }}:{{ service_version }}
+    
+    environment:
+      DOCKGE_STACKS_DIR: {{ dockge_stacks_dir }}
+    
+    ports:
+      - "{{ host_port }}:{{ service_port }}"
+    
+    networks:
+      - {{ network_proxy }}
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - {{ host_config_dir }}:/app/data
+      - {{ host_stacks_dir }}:{{ dockge_stacks_dir }}
+    
+    restart: unless-stopped
+    
+    labels:
+{% if homepage_enabled %}
+      # Homepage Dashboard Integration
+      homepage.group: {{ homepage_group }}
+      homepage.name: {{ homepage_name }}
+      homepage.icon: {{ homepage_icon }}
+      homepage.href: {{ homepage_href }}
+      homepage.description: {{ homepage_description }}
+{% endif %}
+{% if traefik_enabled %}
+      # Traefik Configuration
+      traefik.enable: "true"
+      traefik.docker.network: {{ network_proxy }}
+      traefik.http.services.{{ service_name }}.loadbalancer.server.port: {{ service_port }}
+{% if traefik_preset == 'disabled' %}
+      traefik.enable: "false"
+{% elif traefik_preset == 'internal-only' or traefik_preset == 'all-domains' or traefik_preset == 'personal-only' %}
+      # Local Domain
+      traefik.http.routers.{{ service_name }}-local.rule: Host(`{{ service_subdomain }}{% if host_name %}-{{ host_name }}{% endif %}.{{ domain_root_local }}`)
+      traefik.http.routers.{{ service_name }}-local.entrypoints: {{ traefik_entrypoints }}
+{% if traefik_tls %}
+      traefik.http.routers.{{ service_name }}-local.tls: "true"
+      traefik.http.routers.{{ service_name }}-local.tls.certresolver: {{ traefik_internal_certresolver }}
+{% endif %}
+      traefik.http.routers.{{ service_name }}-local.service: {{ service_name }}
+      
+      # Yggdrasil Domain
+      traefik.http.routers.{{ service_name }}-yggdrasil.rule: Host(`{{ service_subdomain }}{% if host_name %}-{{ host_name }}{% endif %}.{{ domain_root_yggdrasil }}`)
+      traefik.http.routers.{{ service_name }}-yggdrasil.entrypoints: {{ traefik_entrypoints }}
+{% if traefik_tls %}
+      traefik.http.routers.{{ service_name }}-yggdrasil.tls: "true"
+      traefik.http.routers.{{ service_name }}-yggdrasil.tls.certresolver: {{ traefik_internal_certresolver }}
+{% endif %}
+      traefik.http.routers.{{ service_name }}-yggdrasil.service: {{ service_name }}
+{% endif %}
+{% if traefik_preset == 'external-only' or traefik_preset == 'all-domains' or traefik_preset == 'business-only' %}
+      # MagnumTech Domain
+      traefik.http.routers.{{ service_name }}-magnumtech.rule: Host(`{{ service_subdomain }}{% if host_name %}-{{ host_name }}{% endif %}.{{ domain_root_magnumtech }}`)
+      traefik.http.routers.{{ service_name }}-magnumtech.entrypoints: {{ traefik_entrypoints }}
+{% if traefik_tls %}
+      traefik.http.routers.{{ service_name }}-magnumtech.tls: "true"
+      traefik.http.routers.{{ service_name }}-magnumtech.tls.certresolver: {{ traefik_external_certresolver }}
+{% endif %}
+      traefik.http.routers.{{ service_name }}-magnumtech.service: {{ service_name }}
+      
+      # MagnumTek Domain
+      traefik.http.routers.{{ service_name }}-magnumtek.rule: Host(`{{ service_subdomain }}{% if host_name %}-{{ host_name }}{% endif %}.{{ domain_root_magnumtek }}`)
+      traefik.http.routers.{{ service_name }}-magnumtek.entrypoints: {{ traefik_entrypoints }}
+{% if traefik_tls %}
+      traefik.http.routers.{{ service_name }}-magnumtek.tls: "true"
+      traefik.http.routers.{{ service_name }}-magnumtek.tls.certresolver: {{ traefik_external_certresolver }}
+{% endif %}
+      traefik.http.routers.{{ service_name }}-magnumtek.service: {{ service_name }}
+{% endif %}
+{% if traefik_preset == 'external-only' or traefik_preset == 'all-domains' or traefik_preset == 'personal-only' %}
+      # OurJones Family Domain
+      traefik.http.routers.{{ service_name }}-ourjones.rule: Host(`{{ service_subdomain }}{% if host_name %}-{{ host_name }}{% endif %}.{{ domain_root_ourjones }}`)
+      traefik.http.routers.{{ service_name }}-ourjones.entrypoints: {{ traefik_entrypoints }}
+{% if traefik_tls %}
+      traefik.http.routers.{{ service_name }}-ourjones.tls: "true"
+      traefik.http.routers.{{ service_name }}-ourjones.tls.certresolver: {{ traefik_external_certresolver }}
+{% endif %}
+      traefik.http.routers.{{ service_name }}-ourjones.service: {{ service_name }}
+{% endif %}
+{% if traefik_preset == 'external-only' or traefik_preset == 'all-domains' or traefik_preset == 'business-only' %}
+      # HouseholderP Domain
+      traefik.http.routers.{{ service_name }}-householderp.rule: Host(`{{ service_subdomain }}{% if host_name %}-{{ host_name }}{% endif %}.{{ domain_root_householderp }}`)
+      traefik.http.routers.{{ service_name }}-householderp.entrypoints: {{ traefik_entrypoints }}
+{% if traefik_tls %}
+      traefik.http.routers.{{ service_name }}-householderp.tls: "true"
+      traefik.http.routers.{{ service_name }}-householderp.tls.certresolver: {{ traefik_external_certresolver }}
+{% endif %}
+      traefik.http.routers.{{ service_name }}-householderp.service: {{ service_name }}
+      
+      # TrackSoft Domain
+      traefik.http.routers.{{ service_name }}-tracksoft.rule: Host(`{{ service_subdomain }}{% if host_name %}-{{ host_name }}{% endif %}.{{ domain_root_tracksoft }}`)
+      traefik.http.routers.{{ service_name }}-tracksoft.entrypoints: {{ traefik_entrypoints }}
+{% if traefik_tls %}
+      traefik.http.routers.{{ service_name }}-tracksoft.tls: "true"
+      traefik.http.routers.{{ service_name }}-tracksoft.tls.certresolver: {{ traefik_external_certresolver }}
+{% endif %}
+      traefik.http.routers.{{ service_name }}-tracksoft.service: {{ service_name }}
+{% endif %}
+{% else %}
+      # Traefik disabled
+{% endif %}
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+
+networks:
+  {{ network_proxy }}:
+    external: true
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+
+# Data volume uses bind mount ({{ host_config_dir }}) - no named volumes needed

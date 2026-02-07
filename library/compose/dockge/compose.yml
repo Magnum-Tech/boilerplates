@@ -1,0 +1,217 @@
+# ============================================================================
+# STACK: dockge
+# SERVICE: dockge
+#
+# PURPOSE
+#   Dockge is a self-hosted, stack-oriented manager for Docker Compose focused
+#   on managing services via compose.yaml (create/edit/deploy/up/down, logs, exec)
+#   with the compose file as the source of truth
+#
+# ROLE
+#   - Compose-first workflow: operate stacks through their compose.yaml
+#   - UI/UX layer over `docker compose` operations
+#   - Alternative to Portainer for compose-focused management
+#
+# INTERFACES
+#   Exposes:
+#     - Web UI: http://<host>:5001 (default)
+#   Requires:
+#     - Docker socket access (/var/run/docker.sock)
+#   Integrates with:
+#     - Traefik reverse proxy (internal domains)
+#     - Homepage dashboard
+#
+# DATA (PERSISTENT)
+#   - ./data: Dockge application data and configuration
+#   - Stacks directory: Where compose stacks are stored
+#     IMPORTANT: HOST_STACKS_DIR and DOCKGE_STACKS_DIR must match paths
+#
+# CONFIG
+#   Setup: cp .env.example .env && customize .env with your values
+#   Templates: References master templates from ../.envs/ directly
+#   Customize: Override any template values in .env
+#
+# COMMANDS
+#   - Start:   docker compose up -d
+#   - Rebuild: docker compose up -d --build
+#   - Logs:    docker compose logs -f --tail=200 dockge
+#   - Stop:    docker compose down
+#   - Config:  docker compose config
+# ============================================================================
+
+# ----------------------------------------------------------------------------
+# HOMEPAGE LABEL FRAGMENTS
+# ----------------------------------------------------------------------------
+
+x-homepage-labels: &homepage-labels
+  homepage.group: ${HOMEPAGE_GROUP:-Default}
+  homepage.name: ${HOMEPAGE_NAME:-Service}
+  homepage.icon: ${HOMEPAGE_ICON:-docker.png}
+  homepage.href: ${HOMEPAGE_HREF:-http://localhost}
+  homepage.description: ${HOMEPAGE_DESCRIPTION:-No description}
+
+# ----------------------------------------------------------------------------
+# TRAEFIK LABEL FRAGMENTS
+# Use YAML merge keys to compose labels
+#
+# SUBDOMAIN PATTERN:
+#   - Default: ${SERVICE_SUBDOMAIN}
+#   - With host suffix: ${SERVICE_SUBDOMAIN}-${HOST_NAME}
+#   Set HOST_NAME in .env to append host identifier (e.g., "macmini", "proxmox")
+# ----------------------------------------------------------------------------
+
+x-traefik-disabled: &traefik-disabled
+  traefik.enable: false
+
+x-traefik-base: &traefik-base
+  traefik.enable: ${TRAEFIK_ENABLE:-true}
+  traefik.docker.network: ${NETWORK_PROXY:-proxy}
+  traefik.http.services.dockge.loadbalancer.server.port: ${SERVICE_PORT:-80}
+
+x-traefik-domain-local: &traefik-domain-local
+  traefik.http.routers.dockge-local.rule: Host(`${DOMAIN_LOCAL:-${SERVICE_SUBDOMAIN:-dockge}${HOST_NAME:+-}${HOST_NAME}.${DOMAIN_ROOT_LOCAL:-local}}`)
+  traefik.http.routers.dockge-local.entrypoints: ${TRAEFIK_ENTRYPOINTS:-web,websecure}
+  traefik.http.routers.dockge-local.tls: ${TRAEFIK_TLS:-true}
+  traefik.http.routers.dockge-local.tls.certresolver: ${TRAEFIK_INTERNAL_CERTRESOLVER:-internal}
+  traefik.http.routers.dockge-local.service: ${SERVICE_NAME:-dockge}
+
+x-traefik-domain-yggdrasil: &traefik-domain-yggdrasil
+  traefik.http.routers.dockge-yggdrasil.rule: Host(`${DOMAIN_YGGDRASIL:-${SERVICE_SUBDOMAIN:-dockge}${HOST_NAME:+-}${HOST_NAME}.${DOMAIN_ROOT_YGGDRASIL:-yggdrasil.lan}}`)
+  traefik.http.routers.dockge-yggdrasil.entrypoints: ${TRAEFIK_ENTRYPOINTS:-web,websecure}
+  traefik.http.routers.dockge-yggdrasil.tls: ${TRAEFIK_TLS:-true}
+  traefik.http.routers.dockge-yggdrasil.tls.certresolver: ${TRAEFIK_INTERNAL_CERTRESOLVER:-internal}
+  traefik.http.routers.dockge-yggdrasil.service: ${SERVICE_NAME:-dockge}
+
+x-traefik-domain-magnumtech: &traefik-domain-magnumtech
+  traefik.http.routers.dockge-magnumtech.rule: Host(`${DOMAIN_MAGNUMTECH:-${SERVICE_SUBDOMAIN:-dockge}${HOST_NAME:+-}${HOST_NAME}.${DOMAIN_ROOT_MAGNUMTECH:-local.magnumtech.live}}`)
+  traefik.http.routers.dockge-magnumtech.entrypoints: ${TRAEFIK_ENTRYPOINTS:-web,websecure}
+  traefik.http.routers.dockge-magnumtech.tls: ${TRAEFIK_TLS:-true}
+  traefik.http.routers.dockge-magnumtech.tls.certresolver: ${TRAEFIK_EXTERNAL_CERTRESOLVER:-letsencrypt}
+  traefik.http.routers.dockge-magnumtech.service: ${SERVICE_NAME:-dockge}
+
+x-traefik-domain-magnumtek: &traefik-domain-magnumtek
+  traefik.http.routers.dockge-magnumtek.rule: Host(`${DOMAIN_MAGNUMTEK:-${SERVICE_SUBDOMAIN:-dockge}${HOST_NAME:+-}${HOST_NAME}.${DOMAIN_ROOT_MAGNUMTEK:-local.magnumtek.com}}`)
+  traefik.http.routers.dockge-magnumtek.entrypoints: ${TRAEFIK_ENTRYPOINTS:-web,websecure}
+  traefik.http.routers.dockge-magnumtek.tls: ${TRAEFIK_TLS:-true}
+  traefik.http.routers.dockge-magnumtek.tls.certresolver: ${TRAEFIK_EXTERNAL_CERTRESOLVER:-letsencrypt}
+  traefik.http.routers.dockge-magnumtek.service: ${SERVICE_NAME:-dockge}
+
+x-traefik-domain-ourjones: &traefik-domain-ourjones
+  traefik.http.routers.dockge-ourjones.rule: Host(`${DOMAIN_OURJONES:-${SERVICE_SUBDOMAIN:-dockge}${HOST_NAME:+-}${HOST_NAME}.${DOMAIN_ROOT_OURJONES:-homelab.ourjones.family}}`)
+  traefik.http.routers.dockge-ourjones.entrypoints: ${TRAEFIK_ENTRYPOINTS:-web,websecure}
+  traefik.http.routers.dockge-ourjones.tls: ${TRAEFIK_TLS:-true}
+  traefik.http.routers.dockge-ourjones.tls.certresolver: ${TRAEFIK_EXTERNAL_CERTRESOLVER:-letsencrypt}
+  traefik.http.routers.dockge-ourjones.service: ${SERVICE_NAME:-dockge}
+
+x-traefik-domain-householderp: &traefik-domain-householderp
+  traefik.http.routers.dockge-householderp.rule: Host(`${DOMAIN_HOUSEHOLDERP:-${SERVICE_SUBDOMAIN:-dockge}${HOST_NAME:+-}${HOST_NAME}.${DOMAIN_ROOT_HOUSEHOLDERP:-local.householderp.com}}`)
+  traefik.http.routers.dockge-householderp.entrypoints: ${TRAEFIK_ENTRYPOINTS:-web,websecure}
+  traefik.http.routers.dockge-householderp.tls: ${TRAEFIK_TLS:-true}
+  traefik.http.routers.dockge-householderp.tls.certresolver: ${TRAEFIK_EXTERNAL_CERTRESOLVER:-letsencrypt}
+  traefik.http.routers.dockge-householderp.service: ${SERVICE_NAME:-dockge}
+
+x-traefik-domain-tracksoft: &traefik-domain-tracksoft
+  traefik.http.routers.dockge-tracksoft.rule: Host(`${DOMAIN_TRACKSOFT:-${SERVICE_SUBDOMAIN:-dockge}${HOST_NAME:+-}${HOST_NAME}.${DOMAIN_ROOT_TRACKSOFT:-local.tracksoft.solutions}}`)
+  traefik.http.routers.dockge-tracksoft.entrypoints: ${TRAEFIK_ENTRYPOINTS:-web,websecure}
+  traefik.http.routers.dockge-tracksoft.tls: ${TRAEFIK_TLS:-true}
+  traefik.http.routers.dockge-tracksoft.tls.certresolver: ${TRAEFIK_EXTERNAL_CERTRESOLVER:-letsencrypt}
+  traefik.http.routers.dockge-tracksoft.service: ${SERVICE_NAME:-dockge}
+
+# ============================================================================
+# PRESET COMBINATIONS
+# ============================================================================
+
+# All domains - Use for public dashboards and general services
+x-traefik-all-domains: &traefik-all-domains
+  <<: [
+      *traefik-base,
+      *traefik-domain-local,
+      *traefik-domain-yggdrasil,
+      *traefik-domain-magnumtech,
+      *traefik-domain-magnumtek,
+      *traefik-domain-ourjones,
+      *traefik-domain-householderp,
+      *traefik-domain-tracksoft
+    ]
+
+# Internal only - Use for sensitive services (Vaultwarden, database admins)
+x-traefik-internal-only: &traefik-internal-only
+  <<: [
+      *traefik-base,
+      *traefik-domain-local,
+      *traefik-domain-yggdrasil
+    ]
+
+# External only - Use for public-facing services without internal access
+x-traefik-external-only: &traefik-external-only
+  <<: [
+      *traefik-base,
+      *traefik-domain-magnumtech,
+      *traefik-domain-magnumtek,
+      *traefik-domain-ourjones,
+      *traefik-domain-householderp,
+      *traefik-domain-tracksoft
+    ]
+
+# Personal only - Family/personal services (internal + ourjones.family)
+x-traefik-personal-only: &traefik-personal-only
+  <<: [
+      *traefik-base,
+      *traefik-domain-local,
+      *traefik-domain-yggdrasil,
+      *traefik-domain-ourjones
+    ]
+
+# Business only - Work-related services (internal + business domains)
+x-traefik-business-only: &traefik-business-only
+  <<: [
+      *traefik-base,
+      *traefik-domain-householderp,
+      *traefik-domain-tracksoft
+    ]
+
+
+name: ${SERVICE_NAME:-dockge}
+
+services:
+  dockge:
+
+    container_name: ${SERVICE_HOST-dockge}
+    
+    image: ${SERVICE_IMAGE:-louislam/dockge}:${SERVICE_VERSION:-latest}
+    
+    environment:
+      DOCKGE_STACKS_DIR: ${DOCKGE_STACKS_DIR:-/opt/stacks}
+    
+    ports:
+      - "${HOST_PORT:-5001}:${SERVICE_PORT:-5001}"
+    
+    networks:
+      - ${NETWORK_PROXY:-proxy}
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOST_CONFIG_DIR:-./data}:/app/data
+      - ${HOST_STACKS_DIR:-/opt/stacks}:${DOCKGE_STACKS_DIR:-/opt/stacks}
+    
+    restart: unless-stopped
+
+    labels:
+      <<: [
+        *homepage-labels,
+        *traefik-internal-only
+      ]
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+
+networks:
+  proxy:
+    external: true
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+
+# Data volume uses bind mount (./data) - no named volumes needed
